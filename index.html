@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="../MyReact/lib/babel.min.js"></script>
+    <script src="../MyReact/lib/react.development.js"></script>
+    <script src="../MyReact/lib/react-dom.development.js"></script>
+    <title>Document</title>
+    <script>
+      function zoom(src, scrollAble = window, zoomIndex = 4, index = 1.4) {
+        let imgSrc = null;
+        if (src.tagName === "IMG") {
+          imgSrc = src.src;
+        } else {
+          throw new Error("target is not a IMG");
+        }
+
+        // 需要的样式
+        class ZoomStyle {
+          constructor(document) {
+            this.parent = parent;
+            this.document = document;
+            this.zoom_Style_Flag = false;
+            this._init();
+          }
+
+          _getZoomStyle() {
+            let style = document.createElement("style");
+            style.classList.add("zoom_style");
+            style.innerHTML = `
+        .zoom_img_parent {
+          position: relative;
+          display: inline-block;
+          cursor: move;
+        }
+
+        .zoom_img_cover {
+          position: absolute;
+          left: 0;
+          top: 0;
+          font-size: 0;
+        }
+
+        .zoom_img_target {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          background-repeat: no-repeat;
+          filter: drop-shadow(0 0 0 2px red);
+          nbox-shadow: 0 0 0 2px red inset;
+          z-index: 99999;
+        }
+
+        .zoom_img_target_border {
+          border: 2px solid #555;
+          position: absolute;
+          border-radius: 50%;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          z-index: 10;
+          box-sizing: border-box;
+        }
+        
+        .zoom_hide {
+          display: none;
+        }
+        `;
+            return style;
+          }
+
+          _init() {
+            if (
+              !this.zoom_Style_Flag &&
+              !this.document.querySelector(".zoom_style")
+            ) {
+              this.document.append(this._getZoomStyle());
+              this.zoom_Style_Flag = true;
+            }
+          }
+        }
+
+        new ZoomStyle(document.body);
+
+        // 动态创建父元素覆盖
+        class Image {
+          constructor(imageItem, zoomIndex, targetIndex) {
+            this.imageItem = imageItem;
+            this.imageItem.style.userSelect = "none";
+            this.parentItem = document.createElement("div");
+            this.parentItem.style.position = "relative";
+            this.parentItem.style.display = "inline-block";
+            this.parentItem.style.cursor = "move";
+            this.zoomIndex = zoomIndex;
+            this.targetIndex = targetIndex;
+            this.flag = true;
+            if (!this.imageItem.zoom_Item_Flag) {
+              this._init();
+              this.imageItem.zoom_Item_Flag = true;
+            }
+          }
+
+          _createCover() {
+            let cover = document.createElement("div");
+            cover.classList.add("zoom_img_cover");
+            this.cover = cover;
+          }
+
+          _initCover() {
+            this.cover.style.width = `${
+              this.imageItem.offsetWidth / this.zoomIndex
+            }px`;
+            this.cover.style.height = `${
+              this.imageItem.offsetHeight / this.zoomIndex
+            }px`;
+            this.cover.classList.add("zoom_hide");
+            this.parentItem.append(this.cover);
+          }
+
+          _createTarget() {
+            let target = document.createElement("div");
+            target.classList.add("zoom_img_target");
+            this.target = target;
+          }
+
+          _initTarget() {
+            let tempWidth = this.imageItem.offsetWidth / this.targetIndex;
+            let tempHeight = this.imageItem.offsetHeight / this.targetIndex;
+
+            this.target.style.width = `${tempWidth}px`;
+            this.target.style.height = `${tempHeight}px`;
+
+            this.target.baseSize = `${
+              tempWidth > tempHeight ? tempHeight : tempWidth
+            }`;
+
+            this.target.style.clipPath = `circle(${
+              this.target.baseSize / this.targetIndex / 2
+            }px at 50% 50%)`;
+            this.target.classList.add("zoom_hide");
+            this.target.style.backgroundImage = "url(" + imgSrc + ")";
+            this.target.style.backgroundSize = `${
+              (this.imageItem.offsetWidth * this.zoomIndex) / this.targetIndex
+            }px ${
+              (this.imageItem.offsetHeight * this.zoomIndex) / this.targetIndex
+            }px`;
+            this.cover.append(this.target);
+          }
+
+          _createTargetBorder() {
+            let targetBorder = document.createElement("div");
+            targetBorder.classList.add("zoom_img_target_border");
+            this.targetBorder = targetBorder;
+          }
+
+          _initTargetBorder() {
+            this.targetBorder.style.width = `${
+              this.target.baseSize / this.targetIndex
+            }px`;
+            this.targetBorder.style.height = `${
+              this.target.baseSize / this.targetIndex
+            }px`;
+            this.target.append(this.targetBorder);
+          }
+
+          _change(e) {
+            this.lastX = this.x;
+            this.lastY = this.y;
+            let left = e.clientX - this.x - this.cover.offsetWidth / 2;
+            let top = e.clientY - this.y - this.cover.offsetHeight / 2;
+            if (left < 0) {
+              left = 0;
+            }
+            if (left + this.cover.offsetWidth >= this.imageItem.offsetWidth) {
+              left = this.imageItem.offsetWidth - this.cover.offsetWidth;
+            }
+            if (top < 0) {
+              top = 0;
+            }
+            if (top + this.cover.offsetHeight >= this.imageItem.offsetHeight) {
+              top = this.imageItem.offsetHeight - this.cover.offsetHeight;
+            }
+            this.left = left;
+            this.top = top;
+            this.cover.style.left = `${left}px`;
+            this.cover.style.top = `${top}px`;
+            this.target.style.backgroundPosition = `${
+              (-left * this.zoomIndex) / this.targetIndex
+            }px ${(-top * this.zoomIndex) / this.targetIndex}px`;
+          }
+
+          _initParent() {
+            let width = parseFloat(getComputedStyle(this.imageItem)["width"]);
+            this.imageItem.parentElement.replaceChild(
+              this.parentItem,
+              this.imageItem
+            );
+            this.parentItem.append(this.imageItem);
+            this.parentItem.style.width = `${width}px`;
+            this.imageItem.style.width = `${width}px`;
+          }
+
+          _init() {
+            this._createCover();
+            this._createTarget();
+            this._createTargetBorder();
+            this._initCover();
+            this._initTarget();
+            this._initTargetBorder();
+            this._initParent();
+            this.x = this.parentItem.getBoundingClientRect().left;
+            this.y = this.parentItem.getBoundingClientRect().top;
+            let functionChange = this._change.bind(this);
+            this.parentItem.addEventListener("mouseenter", (e) => {
+              if (this.flag) {
+                this.flag = false;
+                this.cover.classList.remove("zoom_hide");
+                this.target.classList.remove("zoom_hide");
+                this.parentItem.addEventListener("mousemove", functionChange);
+              }
+            });
+            this.parentItem.addEventListener("mouseleave", (e) => {
+              if (!this.flag) {
+                this.flag = true;
+                this.cover.classList.add("zoom_hide");
+                this.target.classList.add("zoom_hide");
+                this.parentItem.removeEventListener(
+                  "mousemove",
+                  functionChange
+                );
+              }
+            });
+            scrollAble.addEventListener(
+              "scroll",
+              (this.scrollFunc = () => void img._reInit())
+            );
+          }
+
+          _reInit() {
+            this.x = this.parentItem.getBoundingClientRect().left;
+            this.y = this.parentItem.getBoundingClientRect().top;
+            let left = this.left + (this.lastX - this.x);
+            let top = this.top + (this.lastY - this.y);
+            if (left < 0) {
+              left = 0;
+            }
+            if (left + this.cover.offsetWidth >= this.parentItem.offsetWidth) {
+              left = this.parentItem.offsetWidth - this.cover.offsetWidth;
+            }
+            if (top < 0) {
+              top = 0;
+            }
+            if (top + this.cover.offsetHeight >= this.parentItem.offsetHeight) {
+              top = this.parentItem.offsetHeight - this.cover.offsetHeight;
+            }
+            this.cover.style.left = `${left}px`;
+            this.cover.style.top = `${top}px`;
+            this.target.style.backgroundPosition = `${
+              (-left * this.zoomIndex) / this.targetIndex
+            }px ${(-top * this.zoomIndex) / this.targetIndex}px`;
+          }
+
+          destory() {
+            let img = this.imageItem;
+            let parent = this.parentItem.parentElement;
+            parent.replaceChild(img, this.parentItem);
+            Array.from(this.parentItem.children).forEach((it) => it.remove());
+            this.parentItem.remove();
+            scrollAble.removeEventListener("scroll", this.scrollFunc);
+            img.zoom_Item_Flag = false;
+            img.style.userSelect = "auto";
+          }
+        }
+
+        var img;
+
+        src.addEventListener("load", () => {
+          if (!img) {
+            img = new Image(src, zoomIndex, index);
+          }
+        });
+
+        if (!img) {
+          img = new Image(src, zoomIndex, index);
+        }
+        return img;
+      }
+    </script>
+
+    <style>
+      [c] {
+        width: 300px;
+      }
+
+      img {
+        width: 500px;
+      }
+    </style>
+  </head>
+  <body>
+    <div c>
+      <img src="../../6_Animation/Image/image2.jpg" alt="" />
+    </div>
+
+    <div id="container"></div>
+
+    <script type="text/babel">
+      /*use zoom*/
+      // 现阶段只考虑实现，仅为一层包含
+      // <Zoom zoomIndex index>
+      //  <img src={src}  />
+      // </Zoom>
+
+      const { Component, useRef, createRef, useCallback, useState } = React;
+      class Zoom extends Component {
+        static styleList = {
+          parent: {
+            position: "relative",
+            display: "inline-block",
+          },
+          cover: {
+            position: "absolute",
+            left: 0,
+            top: 0,
+            fontSize: 0,
+          },
+          taret: {
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+            backgroundRepeat: "no-repeat",
+            filter: "drop-shadow(0 0 0 2px red)",
+            nboxShadow: "0 0 0 2px red inset",
+            zIndex: "99999",
+          },
+        };
+
+        static defaultProps = {
+          zoomIndex: 4,
+          targetIndex: 1,
+        };
+
+        static createDiv = (props) => React.createElement("div", { ...props });
+
+        static getDerivedStateFromProps(props) {
+          const { children } = props;
+          if (React.Children.count(children) === 1 && children.type === "img") {
+            return {
+              isPicture: true,
+            };
+          } else {
+            return {
+              isPicture: false,
+            };
+          }
+        }
+
+        constructor(props) {
+          super(props);
+          this.state = {
+            init: false,
+            mounted: false,
+            pictureMounted: false,
+            imgWidth: 0,
+            imgHeight: 0,
+          };
+          this.imgItem = props.children;
+          this.coverEle = this._createCover();
+          this.parentEle = this._createParent();
+          this.targetEle = this._createTarget();
+        }
+
+        parentRef = createRef();
+
+        coverRef = createRef();
+
+        targetRef = createRef();
+
+        imgRef = createRef();
+
+        flag = createRef();
+
+        _createParent = () => {
+          const { parentClassName = "" } = this.props;
+          return Zoom.createDiv({
+            ref: this.parentRef,
+            className: parentClassName,
+            style: Zoom.styleList.parent,
+          });
+        };
+
+        _initParent = () => {
+          const { imgHeight, imgWidth } = this.state;
+          const { current: parent } = this.parentRef;
+          parent.style.cssText = `${parent.style.cssText}; width: ${imgWidth}px; height: ${imgHeight}px`;
+        };
+
+        _createCover = () => {
+          const { coverClassName = "" } = this.props;
+          return Zoom.createDiv({
+            ref: this.coverRef,
+            className: coverClassName,
+            style: Zoom.styleList.cover,
+          });
+        };
+
+        _initCover = () => {
+          const { zoomIndex } = this.props;
+          const { current: cover } = this.coverRef;
+          const { imgHeight, imgWidth } = this.state;
+          cover.style.cssText = `${cover.style.cssText}; width: ${
+            imgWidth / zoomIndex
+          }px; height: ${imgHeight / zoomIndex}px; display: none`;
+        };
+
+        _createTarget = () => {
+          const { targetClassName = "" } = this.props;
+          return Zoom.createDiv({
+            ref: this.targetRef,
+            className: targetClassName,
+            style: Zoom.styleList.taret,
+          });
+        };
+
+        _initTarget = () => {
+          const { targetIndex, zoomIndex } = this.props;
+          const { current: img } = this.imgRef;
+          const { current: target } = this.targetRef;
+          const { imgWidth, imgHeight } = this.state;
+          const tempWidth = imgWidth / targetIndex;
+          const tempHeight = imgHeight / targetIndex;
+          const tempBase = tempWidth > tempHeight ? tempHeight : tempWidth;
+
+          target.style.cssText = `
+          ${target.style.cssText};
+          display: none;
+          width: ${tempWidth}px;
+          height: ${tempHeight}px;
+          background-image: url(${img.src});
+          clip-path: circle(${tempBase / targetIndex / 2}px at 50% 50%);
+          background-size: ${tempWidth * zoomIndex}px ${
+            tempHeight * zoomIndex
+          }px`;
+        };
+
+        init = () => {
+          this._initParent();
+          this._initCover();
+          this._initTarget();
+          this.setState({
+            init: true,
+          });
+        };
+
+        parentMouseEnter = (e) => {
+          const { current: cover } = this.coverRef;
+          const { current: target } = this.targetRef;
+          const { current: parent } = this.parentRef;
+          if (!this.flag.current) {
+            this.flag.current = true;
+            cover.style.display = "block";
+            target.style.display = "block";
+            parent.addEventListener("mousemove", this.parentMouseMove);
+          }
+        };
+
+        parentMouseLeave = (e) => {
+          const { current: cover } = this.coverRef;
+          const { current: target } = this.targetRef;
+          const { current: parent } = this.parentRef;
+          if (this.flag.current) {
+            this.flag.current = false;
+            cover.style.display = "none";
+            target.style.display = "none";
+            parent.removeEventListener("mousemove", this.parentMouseMove);
+          }
+        };
+
+        parentMouseMove = (e) => {
+          const { current: cover } = this.coverRef;
+          const { current: target } = this.targetRef;
+          const { imgWidth, imgHeight } = this.state;
+          const { zoomIndex, targetIndex } = this.props;
+          this.lastX = this.x;
+          this.lastY = this.y;
+          let left = e.clientX - this.x - cover.offsetWidth / 2;
+          let top = e.clientY - this.y - cover.offsetHeight / 2;
+          if (left < 0) {
+            left = 0;
+          }
+          if (left + cover.offsetWidth >= imgWidth) {
+            left = imgWidth - cover.offsetWidth;
+          }
+          if (top < 0) {
+            top = 0;
+          }
+          if (top + cover.offsetHeight >= imgHeight) {
+            top = imgHeight - cover.offsetHeight;
+          }
+          this.left = left;
+          this.top = top;
+          cover.style.left = `${left}px`;
+          cover.style.top = `${top}px`;
+          target.style.backgroundPosition = `${
+            (-left * zoomIndex) / targetIndex
+          }px ${(-top * zoomIndex) / targetIndex}px`;
+        };
+
+        scrollEvent = (e) => {
+          const { current: cover } = this.coverRef;
+          const { current: target } = this.targetRef;
+          const { current: parent } = this.parentRef;
+          const { zoomIndex, targetIndex } = this.props;
+          const rect = parent.getBoundingClientRect();
+          this.x = rect.left;
+          this.y = rect.top;
+          let left = this.left + (this.lastX - this.x);
+          let top = this.top + (this.lastY - this.y);
+          if (left < 0) {
+            left = 0;
+          }
+          if (left + cover.offsetWidth >= parent.offsetWidth) {
+            left = parent.offsetWidth - cover.offsetWidth;
+          }
+          if (top < 0) {
+            top = 0;
+          }
+          if (top + cover.offsetHeight >= parent.offsetHeight) {
+            top = parent.offsetHeight - cover.offsetHeight;
+          }
+          cover.style.left = `${left}px`;
+          cover.style.top = `${top}px`;
+          target.style.backgroundPosition = `${
+            (-left * zoomIndex) / targetIndex
+          }px ${(-top * zoomIndex) / targetIndex}px`;
+        };
+
+        resizeEvent = () => {
+          const { current: img } = this.imgRef;
+          this.setState({
+            imgHeight: img.offsetHeight,
+            imgWidth: img.offsetWidth,
+            init: false,
+          });
+          this.resizeTimmer = setTimeout(() => {
+            this.init();
+          });
+        };
+
+        register = () => {
+          const { current: parent } = this.parentRef;
+          const rect = parent.getBoundingClientRect();
+          this.x = rect.left;
+          this.y = rect.top;
+          parent.addEventListener("mouseenter", this.parentMouseEnter);
+          parent.addEventListener("mouseleave", this.parentMouseLeave);
+          window.addEventListener("scroll", this.scrollEvent);
+        };
+
+        unRegister = () => {
+          const { current: parent } = this.parentRef;
+          if (parent) {
+            parent.removeEventListener("mouseenter", this.parentMouseEnter);
+            parent.removeEventListener("mouseleave", this.parentMouseLeave);
+            parent.removeEventListener("mousemove", this.parentMouseMove);
+          }
+          window.removeEventListener("scroll", this.scrollEvent);
+        };
+
+        initImgRef = (newChildren) => {
+          const { children } = this.props;
+          const targetChildren = newChildren || children;
+          const ref = targetChildren.ref;
+          if (ref) {
+            this.imgRef = ref;
+          } else {
+            this.imgItem = React.cloneElement(targetChildren, {
+              ref: this.imgRef,
+            });
+          }
+        };
+
+        shouldComponentUpdate(nextProps, nextState) {
+          const { children, isPicture } = this.props;
+          const { mounted, init } = this.state;
+          if (nextState.isPicture && children !== nextProps.children) {
+            this.initImgRef(nextProps.children);
+          }
+          if (!nextState.isPicture && mounted && init) {
+            this.unRegister();
+            this.setState({
+              mounted: false,
+              init: false,
+            });
+          }
+          return true;
+        }
+
+        componentDidUpdate(prevProps) {
+          const { children } = this.props;
+          const { current: img } = this.imgRef;
+          const { isPicture, init, mounted } = this.state;
+          if (isPicture && !mounted) {
+            this.setState({
+              mounted: true,
+              imgWidth: img.offsetWidth,
+              imgHeight: img.offsetHeight,
+            });
+          }
+          if (isPicture && mounted && !init) {
+            this.init();
+            this.register();
+          }
+        }
+
+        componentDidMount() {
+          const { current: img } = this.imgRef;
+          const { isPicture, mounted } = this.state;
+          if (isPicture && !mounted) {
+            this.setState({
+              mounted: true,
+              imgWidth: img.offsetWidth,
+              imgHeight: img.offsetHeight,
+            });
+          }
+        }
+
+        render() {
+          const { children } = this.props;
+          const { isPicture, mounted } = this.state;
+          if (isPicture) {
+            if (!mounted) {
+              this.initImgRef();
+              return this.imgItem;
+            }
+            return React.cloneElement(
+              this.parentEle,
+              {},
+              React.cloneElement(
+                this.coverEle,
+                {},
+                React.cloneElement(this.targetEle)
+              ),
+              this.imgItem
+            );
+          } else {
+            return children;
+          }
+        }
+      }
+
+      const Test = () => {
+        const [i, setI] = useState(1);
+        console.log(i);
+
+        return (
+          <div>
+            <button onClick={() => setI((i) => i + 1)}>按钮</button>
+            <Zoom>
+              {i % 2 === 0 ? (
+                <img className="foo" src="../../6_Animation/Image/image2.jpg" />
+              ) : (
+                <span>123</span>
+              )}
+            </Zoom>
+          </div>
+        );
+      };
+
+      ReactDOM.render(<Test />, document.querySelector("#container"));
+    </script>
+
+    <script>
+      addEventListener("load", () => {
+        window.w1 = zoom(document.querySelectorAll("img")[0]);
+      });
+    </script>
+  </body>
+</html>
