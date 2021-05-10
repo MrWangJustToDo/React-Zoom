@@ -39,7 +39,11 @@ class Zoom extends Component {
       };
     } else {
       return {
+        init: false,
+        mounted: false,
+        initWidth: false,
         isPicture: false,
+        needupdate: false,
       };
     }
   }
@@ -49,6 +53,8 @@ class Zoom extends Component {
     this.state = {
       init: false,
       mounted: false,
+      initWidth: false,
+      needupdate: false,
       pictureMounted: false,
       imgWidth: 0,
       imgHeight: 0,
@@ -268,34 +274,47 @@ class Zoom extends Component {
   };
 
   shouldComponentUpdate(nextProps, nextState) {
-    const { children, isPicture } = this.props;
-    const { mounted, init } = this.state;
+    const { children } = this.props;
+    const { mounted, init, isPicture } = this.state;
     if (nextState.isPicture && children !== nextProps.children) {
       this.initImgRef(nextProps.children);
-    }
-    if (!nextState.isPicture && mounted && init) {
-      this.unRegister();
       this.setState({
-        mounted: false,
-        init: false,
+        needupdate: true,
       });
+    }
+    if (isPicture && !nextState.isPicture) {
+      this.unRegister();
     }
     return true;
   }
 
-  componentDidUpdate() {
+  componentDidUpdate(prevProps) {
+    const { children } = this.props;
     const { current: img } = this.imgRef;
-    const { isPicture, init, mounted } = this.state;
+    const { isPicture, init, mounted, initWidth, needupdate } = this.state;
     if (isPicture && !mounted) {
       this.setState({
         mounted: true,
-        imgWidth: img.offsetWidth,
-        imgHeight: img.offsetHeight,
       });
     }
-    if (isPicture && mounted && !init) {
+    if (isPicture && mounted && !initWidth) {
+      setTimeout(() => {
+        this.setState({
+          initWidth: true,
+          imgWidth: img.offsetWidth,
+          imgHeight: img.offsetHeight,
+        });
+      });
+    }
+    if (isPicture && mounted && initWidth && !init) {
       this.init();
       this.register();
+    }
+    if (isPicture && mounted && initWidth && init && needupdate) {
+      this._initTarget();
+      this.setState({
+        needupdate: false,
+      });
     }
   }
 
@@ -305,17 +324,15 @@ class Zoom extends Component {
     if (isPicture && !mounted) {
       this.setState({
         mounted: true,
-        imgWidth: img.offsetWidth,
-        imgHeight: img.offsetHeight,
       });
     }
   }
 
   render() {
     const { children } = this.props;
-    const { isPicture, mounted } = this.state;
+    const { isPicture, mounted, initWidth } = this.state;
     if (isPicture) {
-      if (!mounted) {
+      if (!mounted || !initWidth) {
         this.initImgRef();
         return this.imgItem;
       }
