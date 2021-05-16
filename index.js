@@ -1,6 +1,11 @@
 import React, { Component } from "react";
 
 class Zoom extends Component {
+  static defaultProps = {
+    zoomIndex: 4,
+    targetIndex: 1,
+  };
+
   static styleList = {
     parent: {
       position: "relative",
@@ -21,6 +26,16 @@ class Zoom extends Component {
       filter: "drop-shadow(0 0 0 2px red)",
       nboxShadow: "0 0 0 2px red inset",
       zIndex: "99999",
+    },
+    border: {
+      border: "2px solid red",
+      position: "absolute",
+      borderRadius: "50%",
+      left: "50%",
+      top: "50%",
+      transform: "translate(-50%, -50%)",
+      zIndex: "10",
+      boxSizing: "border-box",
     },
   };
 
@@ -62,6 +77,7 @@ class Zoom extends Component {
     this.imgItem = props.children;
     this.coverEle = this._createCover();
     this.parentEle = this._createParent();
+    this.borderEle = this._createBorder();
     this.targetEle = this._createTarget();
   }
 
@@ -70,6 +86,8 @@ class Zoom extends Component {
   coverRef = createRef();
 
   targetRef = createRef();
+
+  borderRef = createRef();
 
   imgRef = createRef();
 
@@ -108,6 +126,26 @@ class Zoom extends Component {
     }px; height: ${imgHeight / zoomIndex}px; display: none`;
   };
 
+  _createBorder = () => {
+    const { borderClassName = "" } = this.props;
+    return Zoom.createDiv({
+      ref: this.borderRef,
+      className: borderClassName,
+      style: Zoom.styleList.border,
+    });
+  };
+
+  _initBorder = () => {
+    const { targetIndex } = this.props;
+    const { current: border } = this.borderRef;
+    const { imgHeight, imgWidth } = this.state;
+    const tempWidth = imgWidth / targetIndex;
+    const tempHeight = imgHeight / targetIndex;
+    const tempBase = tempWidth > tempHeight ? tempHeight : tempWidth;
+
+    border.style.cssText = `${border.style.cssText}; width: ${tempBase}px; height: ${tempBase}px`;
+  };
+
   _createTarget = () => {
     const { targetClassName = "" } = this.props;
     return Zoom.createDiv({
@@ -140,6 +178,7 @@ class Zoom extends Component {
     this._initParent();
     this._initCover();
     this._initTarget();
+    this._initBorder();
     this.setState({
       init: true,
     });
@@ -342,7 +381,7 @@ class Zoom extends Component {
         React.cloneElement(
           this.coverEle,
           {},
-          React.cloneElement(this.targetEle)
+          React.cloneElement(this.targetEle, {}, this.borderEle)
         ),
         this.imgItem
       );
