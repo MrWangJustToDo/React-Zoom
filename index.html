@@ -358,7 +358,11 @@
 
         static getDerivedStateFromProps(props) {
           const { children } = props;
-          if (React.Children.count(children) === 1 && children.type === "img") {
+          if (
+            React.Children.count(children) === 1 &&
+            children &&
+            children.type === "img"
+          ) {
             return {
               isPicture: true,
             };
@@ -404,7 +408,7 @@
         flag = createRef();
 
         _createParent = () => {
-          const { parentClassName = "" } = this.props;
+          const { parentClassName = "", children } = this.props;
           return Zoom.createDiv({
             ref: this.parentRef,
             className: parentClassName,
@@ -438,6 +442,7 @@
 
         _createBorder = () => {
           const { borderClassName = "" } = this.props;
+          console.log("yunxi");
           return Zoom.createDiv({
             ref: this.borderRef,
             className: borderClassName,
@@ -446,6 +451,8 @@
         };
 
         _initBorder = () => {
+          console.log(this.borderEle);
+          console.log(this.borderRef);
           const { targetIndex } = this.props;
           const { current: border } = this.borderRef;
           const { imgHeight, imgWidth } = this.state;
@@ -481,9 +488,7 @@
           height: ${tempHeight}px;
           background-image: url(${img.src});
           clip-path: circle(${tempBase / targetIndex / 2}px at 50% 50%);
-          background-size: ${tempWidth * zoomIndex}px ${
-            tempHeight * zoomIndex
-          }px`;
+          background-size: ${tempWidth * zoomIndex}px ${tempHeight * zoomIndex}px`;
         };
 
         init = () => {
@@ -624,6 +629,18 @@
           }
         };
 
+        initImgWidth = () => {
+          clearTimeout(this.initImgWidthTimmer);
+          const { current: img } = this.imgRef;
+          this.initImgWidthTimmer = setTimeout(() => {
+            this.setState({
+              initWidth: true,
+              imgWidth: img.offsetWidth,
+              imgHeight: img.offsetHeight,
+            });
+          }, 0);
+        };
+
         shouldComponentUpdate(nextProps, nextState) {
           const { children } = this.props;
           const { mounted, init, isPicture } = this.state;
@@ -650,13 +667,11 @@
             });
           }
           if (isPicture && mounted && !initWidth) {
-            setTimeout(() => {
-              this.setState({
-                initWidth: true,
-                imgWidth: img.offsetWidth,
-                imgHeight: img.offsetHeight,
-              });
-            });
+            if (img.complete) {
+              this.initImgWidth();
+            } else {
+              img.addEventListener("load", this.initImgWidth);
+            }
           }
           if (isPicture && mounted && initWidth && !init) {
             this.init();
@@ -680,6 +695,10 @@
           }
         }
 
+        componentWillUnmount() {
+          this.unRegister();
+        }
+
         render() {
           const { children } = this.props;
           const { isPicture, mounted, initWidth } = this.state;
@@ -694,7 +713,9 @@
               React.cloneElement(
                 this.coverEle,
                 {},
-                React.cloneElement(this.targetEle, {}, this.borderEle)
+                React.cloneElement(
+                  React.cloneElement(this.targetEle, {}, this.borderEle)
+                )
               ),
               this.imgItem
             );

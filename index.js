@@ -1,11 +1,6 @@
 import React, { Component } from "react";
 
 class Zoom extends Component {
-  static defaultProps = {
-    zoomIndex: 4,
-    targetIndex: 1,
-  };
-
   static styleList = {
     parent: {
       position: "relative",
@@ -48,7 +43,11 @@ class Zoom extends Component {
 
   static getDerivedStateFromProps(props) {
     const { children } = props;
-    if (React.Children.count(children) === 1 && children.type === "img") {
+    if (
+      React.Children.count(children) === 1 &&
+      children &&
+      children.type === "img"
+    ) {
       return {
         isPicture: true,
       };
@@ -94,7 +93,7 @@ class Zoom extends Component {
   flag = createRef();
 
   _createParent = () => {
-    const { parentClassName = "" } = this.props;
+    const { parentClassName = "", children } = this.props;
     return Zoom.createDiv({
       ref: this.parentRef,
       className: parentClassName,
@@ -312,6 +311,18 @@ class Zoom extends Component {
     }
   };
 
+  initImgWidth = () => {
+    clearTimeout(this.initImgWidthTimmer);
+    const { current: img } = this.imgRef;
+    this.initImgWidthTimmer = setTimeout(() => {
+      this.setState({
+        initWidth: true,
+        imgWidth: img.offsetWidth,
+        imgHeight: img.offsetHeight,
+      });
+    }, 0);
+  };
+
   shouldComponentUpdate(nextProps, nextState) {
     const { children } = this.props;
     const { mounted, init, isPicture } = this.state;
@@ -328,7 +339,6 @@ class Zoom extends Component {
   }
 
   componentDidUpdate(prevProps) {
-    const { children } = this.props;
     const { current: img } = this.imgRef;
     const { isPicture, init, mounted, initWidth, needupdate } = this.state;
     if (isPicture && !mounted) {
@@ -337,13 +347,11 @@ class Zoom extends Component {
       });
     }
     if (isPicture && mounted && !initWidth) {
-      setTimeout(() => {
-        this.setState({
-          initWidth: true,
-          imgWidth: img.offsetWidth,
-          imgHeight: img.offsetHeight,
-        });
-      });
+      if (img.complete) {
+        this.initImgWidth();
+      } else {
+        img.addEventListener("load", this.initImgWidth);
+      }
     }
     if (isPicture && mounted && initWidth && !init) {
       this.init();
@@ -358,13 +366,16 @@ class Zoom extends Component {
   }
 
   componentDidMount() {
-    const { current: img } = this.imgRef;
     const { isPicture, mounted } = this.state;
     if (isPicture && !mounted) {
       this.setState({
         mounted: true,
       });
     }
+  }
+
+  componentWillUnmount() {
+    this.unRegister();
   }
 
   render() {
@@ -381,7 +392,9 @@ class Zoom extends Component {
         React.cloneElement(
           this.coverEle,
           {},
-          React.cloneElement(this.targetEle, {}, this.borderEle)
+          React.cloneElement(
+            React.cloneElement(this.targetEle, {}, this.borderEle)
+          )
         ),
         this.imgItem
       );
